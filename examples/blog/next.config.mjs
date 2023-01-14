@@ -9,5 +9,9 @@ const withNextra = nextra({
 })
 
 export default withNextra({
+    images: {
+    domains: ['nextrablog.paulapplegate.com'],
+    formats: ['image/avif', 'image/webp'],
+  },
   reactStrictMode: true
 })
