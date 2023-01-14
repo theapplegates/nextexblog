@@ -1,0 +1,79 @@
+import { FileMap, MdxPath, PageMapItem } from './types'
+import { parseFileName } from './utils'
+import filterRouteLocale from './filter-route-locale'
+
+type PageMapProps = {
+  filePath: string
+  items: PageMapItem[]
+  fileMap: FileMap
+  defaultLocale: string
+}
+
+type DynamicMetaDescriptor = {
+  metaFilePath: string
+  metaObjectKeyPath: string
+  metaParentKeyPath: string
+}
+
+function getDynamicMeta(
+  path: string,
+  items: PageMapItem[]
+): [DynamicMetaDescriptor[], PageMapItem[]] {
+  const newItems: PageMapItem[] = []
+  const dynamicMetaItems: DynamicMetaDescriptor[] = []
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    if (item.kind === 'Folder') {
+      const [dynamicItemsInChildren, newItemsInChildren] = getDynamicMeta(
+        `${path}[${i}].children`,
+        item.children
+      )
+      dynamicMetaItems.push(...dynamicItemsInChildren)
+      newItems.push({
+        ...item,
+        children: newItemsInChildren
+      })
+      continue
+    }
+
+    if (item.kind === 'Meta' && item.__nextra_src) {
+      const { __nextra_src, ...newItem } = item
+      dynamicMetaItems.push({
+        metaFilePath: __nextra_src,
+        metaObjectKeyPath: `${path}[${i}]`,
+        metaParentKeyPath: path
+      })
+      newItems.push(newItem)
+      continue
+    }
+    newItems.push(item)
+  }
+
+  return [dynamicMetaItems, newItems]
+}
+
+export function resolvePageMap({
+  filePath,
+  items,
+  fileMap,
+  defaultLocale
+}: PageMapProps): {
+  route: string
+  pageMap: PageMapItem[]
+  dynamicMetaItems: DynamicMetaDescriptor[]
+} {
+  const { locale } = parseFileName(filePath)
+  const pageItem = fileMap[filePath as MdxPath]
+
+  const [dynamicMetaItems, newItems] = getDynamicMeta(
+    '',
+    locale ? filterRouteLocale(items, locale, defaultLocale) : items
+  )
+
+  return {
+    pageMap: newItems,
+    route: pageItem.route,
+    dynamicMetaItems
+  }
+}
